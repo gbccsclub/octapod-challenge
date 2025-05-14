@@ -195,6 +195,14 @@ func (l *Lobby) TimeoutUpdate() {
 func sendErrorAndClose(conn *websocket.Conn, msg string) {
 	errMsg := ErrorMessage{Error: msg}
 	b, _ := json.Marshal(errMsg)
-	conn.WriteMessage(websocket.TextMessage, b)
-	conn.Close()
+	err := conn.WriteMessage(websocket.TextMessage, b)
+	if err != nil {
+		log.Println("Error sending error message:", err)
+		return
+	}
+	err = conn.Close()
+	if err != nil {
+		log.Println("Error closing connection:", err)
+		return
+	}
 }
