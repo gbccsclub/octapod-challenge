@@ -13,26 +13,38 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var UpdateInterval = 10 * time.Second
+var TimeoutInterval = 3 * time.Second
 var MaxInactive = 2
 
 type Lobby struct {
+	DiscordBot   *DiscordBot
 	Maze         *Maze
 	Octapods     map[string]*Octapod
 	Mutex        sync.RWMutex
 	timerRunning bool
 }
 
+type Point struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
+
 func NewLobby(width, height int) *Lobby {
 	maze := NewMaze(width, height)
 	maze.Generate()
 
+	bot := NewDiscordBot()
+	bot.Open()
+
 	lobby := &Lobby{
-		Maze:     maze,
-		Octapods: make(map[string]*Octapod),
+		DiscordBot: bot,
+		Maze:       maze,
+		Octapods:   make(map[string]*Octapod),
 	}
 
 	fmt.Println("\n", maze.Print(), "\n")
-	lobby.StartTimer(5*time.Second, 3*time.Second)
+	lobby.StartTimer(UpdateInterval, TimeoutInterval)
 	return lobby
 }
 
@@ -59,11 +71,40 @@ func (l *Lobby) StartTimer(duration, timeout time.Duration) {
 			} else {
 				l.TimeoutUpdate()
 				log.Println("Timeout update")
+				l.DiscordBot.SendMessage(l.DisplayMaze())
 				t = duration
 			}
 			isTimeout = !isTimeout
 		}
 	}()
+}
+
+func (l *Lobby) DisplayMaze() string {
+	l.Mutex.Lock()
+	defer l.Mutex.Unlock()
+
+	octapodPositions := make(map[Point]*Octapod)
+	for _, o := range l.Octapods {
+		octapodPositions[Point{
+			int(o.Position.X()),
+			int(o.Position.Y()),
+		}] = o
+	}
+
+	var result string
+	for y := 0; y < l.Maze.Height; y++ {
+		for x := 0; x < l.Maze.Width; x++ {
+			if l.Maze.cells[x][y] {
+				result += "# " // Wall
+			} else if octapod, exists := octapodPositions[Point{x, y}]; exists {
+				result += octapod.Id[0:1] + " "
+			} else {
+				result += "  "
+			}
+		}
+		result += "\n"
+	}
+	return "```\n" + result + "```"
 }
 
 func (l *Lobby) HandleJoin(c *gin.Context) {

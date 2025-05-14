@@ -3,11 +3,14 @@ package main
 import (
 	"gbccsclub/octopod-challenge/internal"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
 )
 
 func main() {
+	_ = godotenv.Load(".env")
+
 	router := gin.Default()
 	lobby := internal.NewLobby(20, 20)
 
