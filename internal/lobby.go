@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 var MaxInactive = 2
@@ -17,7 +18,7 @@ var MaxInactive = 2
 type Lobby struct {
 	Maze         *Maze
 	Octapods     map[string]*Octapod
-	Mutex        sync.Mutex
+	Mutex        sync.RWMutex
 	timerRunning bool
 }
 
@@ -26,183 +27,174 @@ func NewLobby(width, height int) *Lobby {
 	maze.Generate()
 
 	lobby := &Lobby{
-		Maze:         maze,
-		Octapods:     make(map[string]*Octapod),
-		timerRunning: false,
+		Maze:     maze,
+		Octapods: make(map[string]*Octapod),
 	}
 
-	fmt.Println()
-	fmt.Println(maze.Print())
-	fmt.Println()
-
+	fmt.Println("\n", maze.Print(), "\n")
 	lobby.StartTimer(5*time.Second, 3*time.Second)
 	return lobby
 }
 
 func (l *Lobby) StartTimer(duration, timeout time.Duration) {
+	l.Mutex.Lock()
 	if l.timerRunning {
+		l.Mutex.Unlock()
 		log.Println("Timer already running.")
 		return
 	}
-
 	l.timerRunning = true
+	l.Mutex.Unlock()
 
 	go func() {
-		timer := time.NewTimer(duration)
-		defer timer.Stop()
-		isWaitingForTimeout := false
-		nextDuration := timeout
-
+		t := duration
+		isTimeout := false
 		for {
-			select {
-			case <-timer.C:
-				if !isWaitingForTimeout {
-					l.Update()
-					log.Println("Sensor data pinged (Update)")
-					nextDuration = timeout
-				} else {
-					l.TimeoutUpdate()
-					log.Println("Timeout update")
-					nextDuration = duration
-				}
-				isWaitingForTimeout = !isWaitingForTimeout
-
-				if !timer.Stop() {
-					select {
-					case <-timer.C:
-					default:
-					}
-				}
-				timer.Reset(nextDuration)
+			timer := time.NewTimer(t)
+			<-timer.C
+			if !isTimeout {
+				l.Update()
+				log.Println("Sensor data pinged (Update)")
+				t = timeout
+			} else {
+				l.TimeoutUpdate()
+				log.Println("Timeout update")
+				t = duration
 			}
+			isTimeout = !isTimeout
 		}
 	}()
 }
 
 func (l *Lobby) HandleJoin(c *gin.Context) {
-	var upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
-	}
-
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-
 	log.Println("New connection established")
 
-	err, authMsg := l.getAuthenticationMessage(conn)
+	err, auth := l.getAuthenticationMessage(conn)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-
 	log.Println("Received an octapod authentication message")
 
-	octapod := l.identifyOctapod(authMsg.ID, authMsg.Password, conn)
-	if octapod == nil {
+	o := l.identifyOctapod(auth.ID, auth.Password, conn)
+	if o == nil {
 		return
 	}
-
-	octapod.Run()
+	o.Run()
 }
 
 func (l *Lobby) getAuthenticationMessage(conn *websocket.Conn) (error, *AuthMessage) {
-	messageType, content, err := conn.ReadMessage()
+	msgType, content, err := conn.ReadMessage()
 	if err != nil {
-		return errors.New("Error reading authentication message:" + err.Error()), nil
+		sendErrorAndClose(conn, "Error reading authentication message: "+err.Error())
+		return err, nil
 	}
-
-	if messageType != websocket.TextMessage {
+	if msgType != websocket.TextMessage {
 		sendErrorAndClose(conn, "Authentication requires a text message with credentials.")
-		return errors.New("received non-text message during authentication"), nil
+		return errors.New("non-text auth message"), nil
 	}
-
-	var authMsg AuthMessage
-	err = json.Unmarshal(content, &authMsg)
-	if err != nil {
+	var auth AuthMessage
+	if err := json.Unmarshal(content, &auth); err != nil {
 		sendErrorAndClose(conn, "Invalid authentication message format.")
-		return errors.New("Error unmarshalling authentication message:" + err.Error()), nil
+		return err, nil
 	}
-
-	return nil, &authMsg
+	return nil, &auth
 }
 
-func (l *Lobby) identifyOctapod(id string, password string, conn *websocket.Conn) *Octapod {
-	log.Println("Identifying octapod", id)
-
+func (l *Lobby) identifyOctapod(id, password string, conn *websocket.Conn) *Octapod {
 	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
-
-	_, isOctapodExisted := l.Octapods[id]
-	var octapod *Octapod
-
-	if isOctapodExisted {
-		octapod = l.Octapods[id]
-		isValidPassword := octapod.VerifyPassword(password)
-
-		if !isValidPassword {
-			log.Println("Octapod exists but password is not correct")
-			sendErrorAndClose(conn, "Octapod exists but password is not correct")
-			octapod.Disconnect()
-			return nil
-		}
-
-		if octapod.Conn != nil {
-			log.Println("Attempting to connect to already connected octapod")
-			sendErrorAndClose(conn, "Octapod is already connected")
-			octapod.Disconnect()
-			return nil
-		}
-
-		octapod.Connect(conn)
-		log.Println("Octapod [", id, "] reconnected")
-	} else {
-		octapod = NewOctapod(id, password, conn, l.Maze)
-
-		l.Octapods[id] = octapod
+	oct, exists := l.Octapods[id]
+	if !exists {
+		oct = NewOctapod(id, password, conn, l.Maze)
+		l.Octapods[id] = oct
+		l.Mutex.Unlock()
 		log.Println("New octapod [", id, "] registered")
+		oct.Run()
+		return oct
 	}
+	// existing
+	l.Mutex.Unlock()
 
-	return octapod
+	// verify and reconnect under octapod's lock
+	oct.Mutex.Lock()
+	defer oct.Mutex.Unlock()
+	if !oct.VerifyPassword(password) {
+		sendErrorAndClose(conn, "Invalid password for octapod")
+		oct.Disconnect()
+		return nil
+	}
+	if oct.Conn != nil {
+		sendErrorAndClose(conn, "Octapod already connected")
+		oct.Disconnect()
+		return nil
+	}
+	oct.Conn = conn
+	log.Println("Octapod [", id, "] reconnected")
+	return oct
 }
 
 func (l *Lobby) Update() {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
+	l.Mutex.RLock()
+	pods := make([]*Octapod, 0, len(l.Octapods))
+	for _, o := range l.Octapods {
+		pods = append(pods, o)
+	}
+	l.Mutex.RUnlock()
 
-	for _, octapod := range l.Octapods {
-		if octapod.Conn == nil {
+	for _, o := range pods {
+		o.Mutex.Lock()
+		if o.Conn == nil {
+			o.Mutex.Unlock()
 			continue
 		}
-		octapod.InactiveCount++
-		sensor := l.Maze.GetSensor(octapod.Position)
-		octapod.Sensor <- sensor
-		log.Println("Sensor data sent to octapod [", octapod.Id, "]")
+		o.InactiveCount++
+		s := l.Maze.GetSensor(o.Position)
+		o.Mutex.Unlock()
+
+		o.Sensor <- s
+		log.Println("Sensor data sent to octapod [", o.Id, "]")
 	}
 }
 
 func (l *Lobby) TimeoutUpdate() {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
+	l.Mutex.RLock()
+	pods := make([]*Octapod, 0, len(l.Octapods))
+	for _, o := range l.Octapods {
+		pods = append(pods, o)
+	}
+	l.Mutex.RUnlock()
 
-	for _, octapod := range l.Octapods {
-		if octapod.Conn == nil {
+	for _, o := range pods {
+		o.Mutex.Lock()
+		if o.Conn == nil {
+			o.Mutex.Unlock()
 			continue
 		}
-		octapod.Sensor <- nil
-		log.Println("Timeout signal sent to octapod", octapod.Id)
-		if octapod.InactiveCount >= MaxInactive {
-			octapod.Disconnect()
-			log.Println("Octapod [", octapod.Id, "] disconnected due to inactivity")
+		o.Mutex.Unlock()
+
+		o.Sensor <- nil
+		log.Println("Timeout signal sent to octapod", o.Id)
+
+		o.Mutex.Lock()
+		if o.InactiveCount >= MaxInactive {
+			o.Mutex.Unlock()
+			o.Disconnect()
+			log.Println("Octapod [", o.Id, "] disconnected due to inactivity")
+		} else {
+			o.Mutex.Unlock()
 		}
 	}
 }
 
-func sendErrorAndClose(conn *websocket.Conn, message string) {
-	errorMessage := ErrorMessage{Error: message}
-	errorJson, _ := json.Marshal(errorMessage)
-	conn.WriteMessage(websocket.TextMessage, errorJson)
+func sendErrorAndClose(conn *websocket.Conn, msg string) {
+	errMsg := ErrorMessage{Error: msg}
+	b, _ := json.Marshal(errMsg)
+	conn.WriteMessage(websocket.TextMessage, b)
 	conn.Close()
 }
