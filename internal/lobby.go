@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,7 +72,7 @@ func (l *Lobby) StartTimer(duration, timeout time.Duration) {
 			} else {
 				l.TimeoutUpdate()
 				log.Println("Timeout update")
-				l.DiscordBot.SendMessage(l.DisplayMaze())
+				l.DiscordBot.SendMessage("Board updated:\n" + l.DisplayMaze(""))
 				t = duration
 			}
 			isTimeout = !isTimeout
@@ -79,16 +80,24 @@ func (l *Lobby) StartTimer(duration, timeout time.Duration) {
 	}()
 }
 
-func (l *Lobby) DisplayMaze() string {
+func (l *Lobby) DisplayMaze(id string) string {
 	l.Mutex.Lock()
 	defer l.Mutex.Unlock()
 
 	octapodPositions := make(map[Point]*Octapod)
+
 	for _, o := range l.Octapods {
-		octapodPositions[Point{
-			int(o.Position.X()),
-			int(o.Position.Y()),
-		}] = o
+		if id == "" {
+			octapodPositions[Point{
+				int(o.Position.X()),
+				int(o.Position.Y()),
+			}] = o
+		} else if o.Id == strings.ToLower(id) {
+			octapodPositions[Point{
+				int(o.Position.X()),
+				int(o.Position.Y()),
+			}] = o
+		}
 	}
 
 	var result string
@@ -102,7 +111,10 @@ func (l *Lobby) DisplayMaze() string {
 				result += "  "
 			}
 		}
-		result += "\n"
+		result += "# \n"
+	}
+	for x := 0; x < l.Maze.Width; x++ {
+		result += "# "
 	}
 	return "```\n" + result + "```"
 }
@@ -123,7 +135,7 @@ func (l *Lobby) HandleJoin(c *gin.Context) {
 	}
 	log.Println("Received an octapod authentication message")
 
-	o := l.identifyOctapod(auth.ID, auth.Password, conn)
+	o := l.identifyOctapod(strings.ToLower(auth.ID), auth.Password, conn)
 	if o == nil {
 		return
 	}
