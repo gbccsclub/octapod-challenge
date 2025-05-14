@@ -1,6 +1,6 @@
 module gbccsclub/octopod-challenge
 
-go 1.24.3
+go 1.24.0
 
 require (
 	github.com/bwmarrin/discordgo v0.28.1 // indirect
