@@ -14,8 +14,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var UpdateInterval = 10 * time.Second
-var TimeoutInterval = 3 * time.Second
+var UpdateInterval = 2 * time.Second
+var TimeoutInterval = 2 * time.Second
 var MaxInactive = 2
 
 type Lobby struct {
@@ -36,13 +36,14 @@ func NewLobby(width, height int) *Lobby {
 	maze.Generate()
 
 	bot := NewDiscordBot()
-	bot.Open()
 
 	lobby := &Lobby{
 		DiscordBot: bot,
 		Maze:       maze,
 		Octapods:   make(map[string]*Octapod),
 	}
+
+	bot.SetLobby(lobby)
 
 	fmt.Println("\n", maze.Print(), "\n")
 	lobby.StartTimer(UpdateInterval, TimeoutInterval)
@@ -97,6 +98,14 @@ func (l *Lobby) DisplayMaze(id string) string {
 				int(o.Position.X()),
 				int(o.Position.Y()),
 			}] = o
+		}
+	}
+
+	if len(octapodPositions) == 0 {
+		if id == "" {
+			return "No octapods in the lobby."
+		} else {
+			return "No octapods [" + id + "] in the lobby."
 		}
 	}
 
@@ -179,13 +188,13 @@ func (l *Lobby) identifyOctapod(id, password string, conn *websocket.Conn) *Octa
 	defer oct.Mutex.Unlock()
 	if !oct.VerifyPassword(password) {
 		sendErrorAndClose(conn, "Invalid password for octapod")
-		oct.Disconnect()
-		return nil
+		conn.Close()
+		return oct
 	}
 	if oct.Conn != nil {
 		sendErrorAndClose(conn, "Octapod already connected")
-		oct.Disconnect()
-		return nil
+		conn.Close()
+		return oct
 	}
 	oct.Conn = conn
 	log.Println("Octapod [", id, "] reconnected")
