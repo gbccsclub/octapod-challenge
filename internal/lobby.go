@@ -14,7 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var UpdateInterval = 1 * 2 * time.Second
+var UpdateInterval = 1 * 60 * time.Second
 var TimeoutInterval = 2 * time.Second
 var MaxInactive = 2
 
