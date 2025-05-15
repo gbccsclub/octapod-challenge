@@ -14,8 +14,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var UpdateInterval = 1 * 60 * time.Second
-var TimeoutInterval = 2 * time.Second
+var UpdateInterval = 1 * 15 * time.Second
+var TimeoutInterval = 1 * time.Second
 var MaxInactive = 2
 
 type Lobby struct {
@@ -127,6 +127,7 @@ func (l *Lobby) DisplayMaze(id string) string {
 	for x := 0; x < l.Maze.Width; x++ {
 		result += "# "
 	}
+	result += "# \n"
 	return "```\n" + result + "```"
 }
 
