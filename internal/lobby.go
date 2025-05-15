@@ -179,6 +179,7 @@ func (l *Lobby) identifyOctapod(id, password string, conn *websocket.Conn) *Octa
 		l.Octapods[id] = oct
 		l.Mutex.Unlock()
 		log.Println("New octapod [", id, "] registered")
+		l.DiscordBot.SendMessage("New octapod [" + id + "] registered")
 		oct.Run()
 		return oct
 	}
@@ -200,6 +201,7 @@ func (l *Lobby) identifyOctapod(id, password string, conn *websocket.Conn) *Octa
 	}
 	oct.Conn = conn
 	log.Println("Octapod [", id, "] reconnected")
+	l.DiscordBot.SendMessage("Octapod [" + id + "] reconnected")
 	return oct
 }
 
