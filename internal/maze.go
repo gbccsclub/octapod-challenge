@@ -91,7 +91,7 @@ func (m *Maze) Print() string {
 			if m.cells[x][y] {
 				result += "  " // Wall
 			} else {
-				result += ". " // Path
+				result += "# " // Path
 			}
 		}
 		result += "\n"

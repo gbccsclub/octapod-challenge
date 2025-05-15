@@ -14,7 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var UpdateInterval = 1 * 60 * time.Second
+var UpdateInterval = 1 * 2 * time.Second
 var TimeoutInterval = 2 * time.Second
 var MaxInactive = 2
 
@@ -45,7 +45,7 @@ func NewLobby(width, height int) *Lobby {
 
 	bot.SetLobby(lobby)
 
-	fmt.Println("\n", maze.Print(), "\n")
+	fmt.Println(maze.Print())
 	lobby.StartTimer(TimeoutInterval)
 	return lobby
 }
