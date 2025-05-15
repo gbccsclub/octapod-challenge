@@ -12,7 +12,7 @@ func main() {
 	_ = godotenv.Load(".env")
 
 	router := gin.Default()
-	lobby := internal.NewLobby(20, 20)
+	lobby := internal.NewLobby(10, 10)
 
 	router.GET("/join", lobby.HandleJoin)
 
