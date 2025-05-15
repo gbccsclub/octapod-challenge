@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var UpdateInterval = 1 * 60 * time.Second
 var TimeoutInterval = 2 * time.Second
 var MaxInactive = 2
 
@@ -50,22 +50,6 @@ func NewLobby(width, height int) *Lobby {
 	return lobby
 }
 
-func getDuration() time.Duration {
-	var duration time.Duration
-	var err error
-	envInterval := os.Getenv("UPDATE_INTERVAL")
-	if envInterval != "" {
-		duration, err = time.ParseDuration(envInterval)
-		if err != nil {
-			log.Println("Invalid UPDATE_INTERVAL:", err)
-			duration = 60 * time.Second
-		}
-	} else {
-		duration = 60 * time.Second
-	}
-	return duration
-}
-
 func (l *Lobby) StartTimer(timeout time.Duration) {
 	l.Mutex.Lock()
 	if l.timerRunning {
@@ -76,7 +60,7 @@ func (l *Lobby) StartTimer(timeout time.Duration) {
 	l.timerRunning = true
 	l.Mutex.Unlock()
 
-	duration := getDuration()
+	duration := UpdateInterval
 
 	go func() {
 		t := duration
@@ -88,7 +72,6 @@ func (l *Lobby) StartTimer(timeout time.Duration) {
 				l.Update()
 				log.Println("Sensor data pinged (Update)")
 				t = timeout
-				duration = getDuration()
 			} else {
 				l.TimeoutUpdate()
 				log.Println("Timeout update")
