@@ -16,3 +16,7 @@ func Vec2(x, y int) Vector {
 func ZeroVec2() Vector {
 	return Vector{0, 0}
 }
+
+func (v Vector) Copy() Vector {
+	return Vector{v.X, v.Y}
+}

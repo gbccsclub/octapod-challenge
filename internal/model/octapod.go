@@ -98,5 +98,5 @@ func (o *Octapod) GetId() string {
 func (o *Octapod) GetPosition() pkg.Vector {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return o.position
+	return o.position.Copy()
 }
