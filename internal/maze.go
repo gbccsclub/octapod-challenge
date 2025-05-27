@@ -2,6 +2,7 @@
 package internal
 
 import (
+	"gbccsclub/octopod-challenge/pkg"
 	"github.com/quartercastle/vector"
 	"math/rand"
 )
@@ -109,8 +110,8 @@ func (m *Maze) IsAvailable(point vector.Vector) bool {
 	return x >= 0 && x < m.Width && y >= 0 && y < m.Height && !m.cells[x][y]
 }
 
-func (m *Maze) GetSensor(point vector.Vector) *Sensor {
-	return &Sensor{
+func (m *Maze) GetSensor(point vector.Vector) *pkg.Sensor {
+	return &pkg.Sensor{
 		Up:    m.IsAvailable(point.Add(vector.Vector{0, -1})),
 		Right: m.IsAvailable(point.Add(vector.Vector{1, 0})),
 		Down:  m.IsAvailable(point.Add(vector.Vector{0, 1})),

@@ -23,7 +23,7 @@
 //			content += "Maze:\n" + lobby.DisplayMaze("") + "\n"
 //			content += "Octapods:\n"
 //			for id, oct := range lobby.Octapods {
-//				position := oct.Position
+//				position := oct.position
 //				content += id + " (" + strconv.Itoa(int(position.X())) + "," + strconv.Itoa(int(position.Y())) + ")\n"
 //			}
 //
@@ -66,8 +66,9 @@ func main() {
 	templ := web.NewTemplates()
 	config := server.NewConfig()
 	adminHandler := handler.NewAdminHandler(config)
+	octapodHandler := handler.NewOctapodHandler()
 
-	// ================== Setup routes ==================
+	// ================== Setup static routes ==================
 
 	router.GET("/", func(c *gin.Context) {
 		templ.Render(c.Writer, "index", nil)
@@ -79,6 +80,12 @@ func main() {
 
 	router.POST("/admin/update", func(c *gin.Context) {
 		adminHandler.HandleUpdateConfig(c, templ)
+	})
+
+	// ================== Setup websocket routes ==================
+
+	router.GET("/join", func(c *gin.Context) {
+		octapodHandler.HandleJoin(c)
 	})
 
 	var port = "3000"

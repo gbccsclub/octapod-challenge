@@ -31,14 +31,14 @@ func (ah *AdminHandler) HandleGetConfig(c *gin.Context, templ *web.Templates) {
 	templ.Render(c.Writer, "admin", props)
 }
 
-func (ah *AdminHandler) HandleUpdateConfig(c *gin.Context, templ *web.Templates) {
+func (ah *AdminHandler) HandleUpdateConfig(c *gin.Context, templ *web.Templates) bool {
 	password := c.PostForm("password")
 	hashedPassword := os.Getenv("HASHED_PASSWORD")
 	if bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password)) != nil {
 		templ.Render(c.Writer, "error_message", map[string]interface{}{
 			"Message": "Invalid password",
 		})
-		return
+		return false
 	}
 
 	tickInterval, err := strconv.Atoi(c.PostForm("tick_interval"))
@@ -46,7 +46,7 @@ func (ah *AdminHandler) HandleUpdateConfig(c *gin.Context, templ *web.Templates)
 		templ.Render(c.Writer, "error_message", map[string]interface{}{
 			"Message": "Invalid tick interval",
 		})
-		return
+		return false
 	}
 
 	timeoutInterval, err := strconv.Atoi(c.PostForm("timeout_interval"))
@@ -54,7 +54,7 @@ func (ah *AdminHandler) HandleUpdateConfig(c *gin.Context, templ *web.Templates)
 		templ.Render(c.Writer, "error_message", map[string]interface{}{
 			"Message": "Invalid timeout interval",
 		})
-		return
+		return false
 	}
 
 	mazeSize, err := strconv.Atoi(c.PostForm("maze_size"))
@@ -62,7 +62,7 @@ func (ah *AdminHandler) HandleUpdateConfig(c *gin.Context, templ *web.Templates)
 		templ.Render(c.Writer, "error_message", map[string]interface{}{
 			"Message": "Invalid maze size",
 		})
-		return
+		return false
 	}
 
 	ah.config.Set(tickInterval, timeoutInterval, mazeSize)
@@ -71,4 +71,6 @@ func (ah *AdminHandler) HandleUpdateConfig(c *gin.Context, templ *web.Templates)
 	templ.Render(c.Writer, "success_message", map[string]interface{}{
 		"Message": "Configuration updated successfully",
 	})
+
+	return true
 }
