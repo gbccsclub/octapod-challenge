@@ -1,0 +1,7 @@
+{{ block "success_message" . }}
+<div class="toast toast-top toast-end" hx-ext="remove-me" remove-me="3s">
+    <div class="alert alert-success">
+        <span>{{ .Message }}</span>
+    </div>
+</div>
+{{ end }}
