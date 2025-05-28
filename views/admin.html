@@ -33,14 +33,24 @@
                value="{{.TickInterval}}"
                required>
 
-        <label for="timeout_interval" class="label-text">
-            Timeout Interval (ms):
+        <label for="max_exploration_steps" class="label-text">
+            Max Exploration Steps:
         </label>
         <input type="number"
-               id="timeout_interval"
-               name="timeout_interval"
-               value="{{.TimeoutInterval}}"
+               id="max_exploration_steps"
                class="input input-bordered"
+               name="max_exploration_steps"
+               value="{{.MaxExplorationSteps}}"
+               required>
+
+        <label for="max_solving_steps" class="label-text">
+            Max Solving Steps:
+        </label>
+        <input type="number"
+               id="max_solving_steps"
+               class="input input-bordered"
+               name="max_solving_steps"
+               value="{{.MaxSolvingSteps}}"
                required>
 
         <label for="maze_size" class="label-text">
@@ -53,6 +63,26 @@
                class="input input-bordered"
                required>
 
+        <label for="discord_bot_token" class="label-text">
+            Discord Bot Token:
+        </label>
+        <input type="text"
+               id="discord_bot_token"
+               name="discord_bot_token"
+               value=""
+               class="input input-bordered"
+               required>
+
+        <label for="discord_channel_id" class="label-text">
+            Discord Channel Id:
+        </label>
+        <input type="text"
+               id="discord_channel_id"
+               name="discord_channel_id"
+               value="{{.DiscordChannelId}}"
+               class="input input-bordered"
+               required>
+
         <label for="password" class="label-text">
             Password:
         </label>
@@ -61,7 +91,6 @@
                name="password"
                class="input input-bordered"
                required>
-
         <br>
 
         <input hx-post="/admin/update"

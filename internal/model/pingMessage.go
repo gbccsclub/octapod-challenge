@@ -1,4 +1,4 @@
-package payload
+package model
 
 import (
 	"gbccsclub/octopod-challenge/pkg"
@@ -6,10 +6,15 @@ import (
 
 type Status string
 
+func (s Status) String() string {
+	return string(s)
+}
+
 const (
 	Exploring Status = "Explore"
 	Solving   Status = "Solve"
 	Solved    Status = "Solved"
+	Ended     Status = "Ended"
 )
 
 type PingMessage struct {

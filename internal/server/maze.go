@@ -1,9 +1,8 @@
 // AI generated. I will not take responsibility for any damage caused by this code.
-package internal
+package server
 
 import (
 	"gbccsclub/octopod-challenge/pkg"
-	"github.com/quartercastle/vector"
 	"math/rand"
 )
 
@@ -83,57 +82,31 @@ func (m *Maze) carvePassages(x, y int) {
 	}
 }
 
-// Print returns a string representation of the maze
-// "#" represents walls and " " represents paths
-func (m *Maze) Print() string {
-	var result string
-	for y := 0; y < m.Height; y++ {
-		for x := 0; x < m.Width; x++ {
-			if m.cells[x][y] {
-				result += "  " // Wall
-			} else {
-				result += "# " // Path
-			}
-		}
-		result += "\n"
-	}
-	return result
-}
-
 // Now this is my code.
 // Which was auto completed by copilot, but I was actively engaging with it.
 // And there's no comments. No comments = Human.
 
-func (m *Maze) IsAvailable(point vector.Vector) bool {
-	x := int(point.X())
-	y := int(point.Y())
+func (m *Maze) IsAvailable(point pkg.Vector) bool {
+	x := point.X
+	y := point.Y
 	return x >= 0 && x < m.Width && y >= 0 && y < m.Height && !m.cells[x][y]
 }
 
-func (m *Maze) GetSensor(point vector.Vector) *pkg.Sensor {
+// GetSensor returns a sensor for the given point
+// True means there is a wall
+func (m *Maze) GetSensor(point pkg.Vector) *pkg.Sensor {
 	return &pkg.Sensor{
-		Up:    m.IsAvailable(point.Add(vector.Vector{0, -1})),
-		Right: m.IsAvailable(point.Add(vector.Vector{1, 0})),
-		Down:  m.IsAvailable(point.Add(vector.Vector{0, 1})),
-		Left:  m.IsAvailable(point.Add(vector.Vector{-1, 0})),
+		Up:    !m.IsAvailable(point.Up()),
+		Down:  !m.IsAvailable(point.Down()),
+		Right: !m.IsAvailable(point.Right()),
+		Left:  !m.IsAvailable(point.Left()),
 	}
 }
 
-func (m *Maze) Visit(position vector.Vector) {
-	m.visited[int(position.X())][int(position.Y())] = true
+func (m *Maze) Visit(position pkg.Vector) {
+	m.visited[position.X][position.Y] = true
 }
 
-func (m *Maze) PrintVisited() string {
-	var result string
-	for y := 0; y < m.Height; y++ {
-		for x := 0; x < m.Width; x++ {
-			if !m.cells[x][y] && m.visited[x][y] {
-				result += "# " // Path
-			} else {
-				result += "  " // Wall
-			}
-		}
-		result += "\n"
-	}
-	return result
+func (m *Maze) IsSolved(position pkg.Vector) bool {
+	return position.X == m.Width-1 && position.Y == m.Height-1
 }

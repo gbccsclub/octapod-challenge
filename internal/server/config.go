@@ -1,36 +1,35 @@
 package server
 
-import "sync"
+import (
+	"os"
+	"sync"
+)
 
 type Config struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 
 	// Loop
-	updateInterval  int
-	timeoutInterval int
+	TickInterval int
+
+	// Competition settings
+	MaxExplorationSteps int
+	MaxSolvingSteps     int
 
 	// Maze
-	mazeSize int
+	MazeSize int
+
+	// Discord
+	DiscordBotToken  string
+	DiscordChannelId string
 }
 
 func NewConfig() *Config {
 	return &Config{
-		updateInterval:  30,
-		timeoutInterval: 10,
-		mazeSize:        10,
+		TickInterval:        3000,
+		MaxExplorationSteps: 2 * 10 * 10,
+		MaxSolvingSteps:     5 * 10,
+		MazeSize:            10,
+		DiscordBotToken:     os.Getenv("DISCORD_BOT_TOKEN"),
+		DiscordChannelId:    os.Getenv("DISCORD_CHANNEL_ID"),
 	}
-}
-
-func (c *Config) Get() (int, int, int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.updateInterval, c.timeoutInterval, c.mazeSize
-}
-
-func (c *Config) Set(updateInterval, timeoutInterval, mazeSize int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.updateInterval = updateInterval
-	c.timeoutInterval = timeoutInterval
-	c.mazeSize = mazeSize
 }

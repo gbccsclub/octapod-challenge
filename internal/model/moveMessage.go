@@ -1,4 +1,4 @@
-package payload
+package model
 
 import (
 	"gbccsclub/octopod-challenge/pkg"

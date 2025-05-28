@@ -2,7 +2,6 @@ package model
 
 import (
 	"encoding/json"
-	"gbccsclub/octopod-challenge/internal/payload"
 	"gbccsclub/octopod-challenge/pkg"
 	"github.com/gorilla/websocket"
 	"log"
@@ -12,7 +11,9 @@ import (
 type Octapod struct {
 	mu           sync.Mutex
 	moveReceived bool
-	moveMsg      *payload.MoveMessage
+	moveMsg      *MoveMessage
+	sensor       *pkg.Sensor
+	tickId       string
 
 	id           string
 	position     pkg.Vector
@@ -23,6 +24,8 @@ type Octapod struct {
 func NewOctapod(id string, position pkg.Vector, conn *websocket.Conn, onDisconnect func(id string)) *Octapod {
 	return &Octapod{
 		moveReceived: false,
+		moveMsg:      nil,
+		sensor:       pkg.NewSensor(true, true, true, true),
 		id:           id,
 		position:     position,
 		conn:         conn,
@@ -34,28 +37,16 @@ func (o *Octapod) Run() {
 	go o.readLoop()
 }
 
-func (o *Octapod) Ping(pingMsg *payload.PingMessage) error {
+func (o *Octapod) Ping(tickId string, sensor *pkg.Sensor, status Status) error {
 	o.mu.Lock()
 	o.moveReceived = false
 	o.moveMsg = nil
+	o.tickId = tickId
+	o.sensor = sensor
 	o.mu.Unlock()
+
+	pingMsg := NewPingMessage(tickId, sensor, o.position, status)
 	return o.conn.WriteJSON(pingMsg)
-}
-
-func (o *Octapod) TryUpdate(tickId string) bool {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-
-	if !o.moveReceived || o.moveMsg == nil || o.moveMsg.TickId != tickId {
-		log.Printf("Move not received for %s\n", o.id)
-		return false
-	}
-
-	log.Printf("Applying move %s to %s\n", o.moveMsg.MoveDirection, o.id)
-	o.position = o.position.Add(o.moveMsg.ToVector())
-	o.moveMsg = nil
-	o.moveReceived = false
-	return true
 }
 
 func (o *Octapod) Disconnect() {
@@ -66,6 +57,26 @@ func (o *Octapod) Disconnect() {
 		log.Printf("Error closing connection for %s: %v\n", o.id, err)
 		return
 	}
+}
+
+func (o *Octapod) TryUpdate() pkg.Vector {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	if o.moveMsg == nil {
+		return o.position
+	}
+
+	moveDirection := o.moveMsg.ToVector()
+
+	if o.sensor.IsBlocked(moveDirection) {
+		log.Printf("Move blocked for %s: %s\n", o.id, o.moveMsg.MoveDirection)
+		return o.position
+	}
+
+	log.Printf("Applying moveMsg %s to %s\n", o.moveMsg.MoveDirection, o.id)
+	o.position = o.position.Add(moveDirection)
+	return o.position
 }
 
 func (o *Octapod) readLoop() {
@@ -80,14 +91,28 @@ func (o *Octapod) readLoop() {
 			return
 		}
 
-		var move payload.MoveMessage
-		if err := json.Unmarshal(data, &move); err == nil {
-			o.mu.Lock()
-			log.Printf("Move received from %s: %s\n", o.id, move.MoveDirection)
-			o.moveReceived = true
-			o.moveMsg = &move
-			o.mu.Unlock()
+		if o.moveReceived {
+			log.Printf("Move already received for %s\n", o.id)
+			continue
 		}
+		o.moveReceived = true
+
+		var moveMsg MoveMessage
+		err = json.Unmarshal(data, &moveMsg)
+		if err != nil {
+			log.Printf("Error unmarshalling moveMsg for %s: %v\n", o.id, err)
+			continue
+		}
+
+		if o.tickId != moveMsg.TickId {
+			log.Printf("Tick id mismatch for %s: %s != %s\n", o.id, o.tickId, moveMsg.TickId)
+			continue
+		}
+
+		o.mu.Lock()
+		log.Printf("Move received from %s: %s\n", o.id, moveMsg.MoveDirection)
+		o.moveMsg = &moveMsg
+		o.mu.Unlock()
 	}
 }
 

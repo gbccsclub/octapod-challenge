@@ -49,7 +49,6 @@
 package main
 
 import (
-	"gbccsclub/octopod-challenge/internal/handler"
 	"gbccsclub/octopod-challenge/internal/server"
 	"gbccsclub/octopod-challenge/internal/web"
 	"github.com/gin-gonic/gin"
@@ -62,31 +61,31 @@ func main() {
 	_ = godotenv.Load(".env")
 
 	router := gin.Default()
-
 	templ := web.NewTemplates()
 	config := server.NewConfig()
-	adminHandler := handler.NewAdminHandler(config)
-	octapodHandler := handler.NewOctapodHandler()
+	lobby := server.NewLobby(config)
 
-	// ================== Setup static routes ==================
+	// ==================== Static Routes ====================
 
 	router.GET("/", func(c *gin.Context) {
 		templ.Render(c.Writer, "index", nil)
 	})
 
 	router.GET("/admin", func(c *gin.Context) {
-		adminHandler.HandleGetConfig(c, templ)
+		lobby.AdminHandler.HandleGetConfig(c, templ)
 	})
 
 	router.POST("/admin/update", func(c *gin.Context) {
-		adminHandler.HandleUpdateConfig(c, templ)
+		lobby.AdminHandler.HandleUpdateConfig(c, templ, lobby)
 	})
 
-	// ================== Setup websocket routes ==================
+	// ==================== Websocket Routes ====================
 
 	router.GET("/join", func(c *gin.Context) {
-		octapodHandler.HandleJoin(c)
+		lobby.OctapodHandler.HandleJoin(c)
 	})
+
+	lobby.Start()
 
 	var port = "3000"
 	if os.Getenv("PORT") != "" {
